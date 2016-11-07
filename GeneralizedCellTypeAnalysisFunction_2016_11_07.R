@@ -113,6 +113,7 @@ cellTypeFunction <- function(userInput, dataColumns, geneColumn, species){
     row.names(temp)<-names(table(GeneNamesForJoinedInput_NoSD0))
     colnames(temp)<-colnames(ZscoreInput)
     ZscoreInput<-t(scale(t(temp), center=T, scale=T))
+    GeneNamesForJoinedInput_NoSD0<-as.matrix(as.character(row.names(temp)))
     
     write.csv(ZscoreInput, "ZscoreInput_AveragedByGeneSymbol.csv")
     print("Output added to working directory: ZscoreInput_AveragedByGeneSymbol.csv")
