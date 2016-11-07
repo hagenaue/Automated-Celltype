@@ -31,9 +31,6 @@ cellTypeFunction <- function(userInput, dataColumns, geneColumn, species){
   GeneNamesForJoinedInput <- userInput[,geneColumn]
   GeneNamesForJoinedInput <- as.matrix(GeneNamesForJoinedInput)
   
-  #MH: I added a little feedback to the user here:
-  print("The number of unique gene symbols (rows) included in the user's input:")
-  print(length(unique(GeneNamesForJoinedInput)))
   
   #########
   #Question from MH: why is this code commented out? Oh - this file hasn't even been read in yet, and the code for this is later. We can probably just delete this.
@@ -125,9 +122,22 @@ cellTypeFunction <- function(userInput, dataColumns, geneColumn, species){
   #############################################################
   #MH: We should probably add some code for determining if the gene symbols are unique, and if not averaging by gene symbol. I have that code included elsewhere - I'll dig it up.
   
+  #MH: I added a little feedback to the user here:
+  print("The number of unique gene symbols (rows) included in the user's input after filtering out genes with expression that completely lacked variability (sd=0):")
+  print(length(unique(GeneNamesForJoinedInput_NoSD0)))
   
-  
-  
+  if(length(unique(GeneNamesForJoinedInput_NoSD0))==length((GeneNamesForJoinedInput_NoSD0[,1]))){print("All gene symbols are now unique.")}else{
+    print("The gene symbols are not unique, the z-scored data will be averaged by gene symbol and then re-z-scored")
+    
+    temp<-matrix(0, length(unique(GeneNamesForJoinedInput_NoSD0)), ncol(ZscoreInput))
+    
+    for(i in c(1:ncol(ZscoreInput))){
+      temp[,i]<-tapply(ZscoreInput[,i], GeneNamesForJoinedInput_NoSD0[,1], mean)
+    }
+    row.names(temp)<-names(table(GeneNamesForJoinedInput_NoSD0))
+    colnames(temp)<-colnames(ZscoreInput)
+    ZscoreInput<-temp
+  }
   
   
   #############################################################
