@@ -4,16 +4,14 @@ cellTypeFunction <- function(userInput, dataColumns, geneColumn, species){
   #install.packages("plyr")
   #library(plyr)
   
-  #MH: What's this?
-  #FIXME
-  #not availible for 3.3.1 
-  
   
   #DATASET READ IN
   #userInput <- read.table(file = fileName, header = T, sep = ",", stringsAsFactors = F)
   #userInput <- read.table(file = "JoinedZhang_AsNumMatrix_Log2.csv", header = T, sep = ",", stringsAsFactors = F)
   
+  
   #MH: I'm adding some code to double check that the parameters fit requirements:
+  #Alek - this would be a good place to stop the code if there is an error.
   
   if(is.data.frame(userInput)==F){print("Error: Your userInput is not a data.frame")}else{print("Good: The userInput is a data frame")}
   
@@ -30,20 +28,6 @@ cellTypeFunction <- function(userInput, dataColumns, geneColumn, species){
   #MH: I generalized this to specify the gene column number:
   GeneNamesForJoinedInput <- userInput[,geneColumn]
   GeneNamesForJoinedInput <- as.matrix(GeneNamesForJoinedInput)
-  
-  
-  #########
-  #Question from MH: why is this code commented out? Oh - this file hasn't even been read in yet, and the code for this is later. We can probably just delete this.
-  
-  #using the appropriate gene symbols based on user Input "species":
-  #if (species == "Mouse" || species == "mouse"){
-  #  CellTypeGeneColumn = 5
-  #}
-  #else{
-  #  CellTypeGeneColumn = 4
-  #}
-  
-  #function begins
   
   #MH: I generalized this to specify the data column numbers:
   TempJoinedInput_AsNum <- userInput[,dataColumns]
@@ -78,25 +62,16 @@ cellTypeFunction <- function(userInput, dataColumns, geneColumn, species){
   
   
   ##################################################
-  #Test stuff
   
-  #MH: This shouldn't be necessary to include, so I'm commenting it out:
-  #temp3<-apply(TempJoinedInput_AsNum, 1, max)
-  #sum(temp3<2)
-  #9787
+  #MH: We should probably double check whether there are NA columns/rows too - they may crash the function, since the z-score function depends on mean and sd calculations. 
+  #Actually, it may actually be o.k. - we should probably test it though.
   
-  #sum(temp3<3)
-  #11889
   
-  #sum(temp3<3)/length(temp3)
-  #.529 or 53%
   
   ##################################################
   
-  #MH: We should probably double check whether there are NA columns/rows too - they may crash the function, since the z-score function depends on mean and sd calculations. 
-  
   #MH: This code determines how many of the rows (probes/genes) have zero variability and therefore have to be removed from the   calculations - I've made it so that the user gets some feedback about what is happening:
-  JoinedInput_StDev<-apply(TempJoinedInput_AsNum, 1, sd) 
+  JoinedInput_StDev<-apply(TempJoinedInput_AsNum, 1, function(y) sd(y, na.rm=T)) 
   
   print("The number of rows in the dataset that show no variability (sd=0):")
   #MH: this originally said "return" but I'm not sure why. I changed it to print
@@ -114,13 +89,14 @@ cellTypeFunction <- function(userInput, dataColumns, geneColumn, species){
   
   ZscoreInput<-t(scale(t(JoinedInput_AsNumMatrix_Log2_NoSD0), center=T, scale=T))#Zscores the data 
   write.csv(ZscoreInput, "ZscoreInput.csv")
-  print("A z-scored version of your input has been outputted to your working directory (ZscoreInput.csv), with all rows removed that had zero variability.")
+  print("Output added to working directory: ZscoreInput.csv")
+  print("...ZscoreInput.csv is a data frame that includes a a z-scored version of your input (centered and scaled by row), with all rows removed that had zero variability.")
   
   sum(is.na(ZscoreInput))
   # ZERO WOOOOOOOOOO
   
   #############################################################
-  #MH: We should probably add some code for determining if the gene symbols are unique, and if not averaging by gene symbol. I have that code included elsewhere - I'll dig it up.
+  #Code for determining if the gene symbols are unique, and if not averaging by gene symbol.
   
   #MH: I added a little feedback to the user here:
   print("The number of unique gene symbols (rows) included in the user's input after filtering out genes with expression that completely lacked variability (sd=0):")
@@ -136,9 +112,14 @@ cellTypeFunction <- function(userInput, dataColumns, geneColumn, species){
     }
     row.names(temp)<-names(table(GeneNamesForJoinedInput_NoSD0))
     colnames(temp)<-colnames(ZscoreInput)
-    ZscoreInput<-temp
+    ZscoreInput<-t(scale(t(temp), center=T, scale=T))
+    
+    write.csv(ZscoreInput, "ZscoreInput_AveragedByGeneSymbol.csv")
+    print("Output added to working directory: ZscoreInput_AveragedByGeneSymbol.csv")
+    print("...ZscoreInput_AveragedByGeneSymbol.csv is a data frame that includes a a z-scored version of your input, with all rows removed that had zero variability. Data was then averaged by gene symbol, and z-scored again so that the data for each gene symbol is centered and scaled.")
   }
   
+
   
   #############################################################
   
@@ -151,10 +132,12 @@ cellTypeFunction <- function(userInput, dataColumns, geneColumn, species){
   #MH - the removing NA values code was moved later.
   
   #############################################################
+  
+  dir.create("Detailed_CellTypeAnalysisOutput")
+  setwd("Detailed_CellTypeAnalysisOutput")
+  
   #joining celltype to zscore data
   tempForJoin <- data.frame(GeneNamesForJoinedInput_NoSD0, ZscoreInput, stringsAsFactors=F)
-  #I added this dependency to the beginning of the code
-  #library(plyr)
   
   #########
   #choosing which gene symbol to reference in the cell type specific gene database based on user Input "species":
@@ -172,8 +155,8 @@ cellTypeFunction <- function(userInput, dataColumns, geneColumn, species){
   }else{print("Error: The designated species is not in our database.")} 
   
   print("Output added to working directory: ZscoreInput_Expression_CellType.csv")
-  print("   * A data frame listing all of the cell type specific genes in your dataset and their respective expression for each sample (in z-scores).") 
-  print("   * Please note that the cell type specific genes included in this output have not yet been filtered based on whether they were identified as specifically expressed in different cell types in different publications (e.g. a gene that has been identified as specifically expressed in astrocytes in one publication but identified as specifically expressed in neurons in another publication).")
+  print("...ZscoreInput_Expression_CellType.csv is a data frame listing all of the cell type specific genes in your dataset and their respective expression for each sample (in z-scores).") 
+  print("...Please note that the cell type specific genes included in this output have not yet been filtered based on whether they were identified as specifically expressed in different cell types in different publications (e.g. a gene that has been identified as specifically expressed in astrocytes in one publication but identified as specifically expressed in neurons in another publication).")
   
   ####################################
   #///////////////////////////////////
@@ -227,9 +210,9 @@ cellTypeFunction <- function(userInput, dataColumns, geneColumn, species){
   write.csv(AVE_Expression_CellType_Tag_bySample, "AVE_Expression_CellType_Tag_bySample.csv")
   
  print("Output added to working directory: AVE_Expression_CellType_Tag_bySample.csv, CorrelationMatrixCellIndexVsCellIndex.csv")
- print("  *The file AVE_Expression_CellType_Tag_bySample.csv includes the average z-score for each sample for all genes identified as cell type specific for each cell type from each publication - a cell type index. This can be treated as one type of estimate of the relative balance of each cell type across all samples.")
-print("   *The file CorrelationMatrixCellIndexVsCellIndex.csv shows the correlation between each of these cell type indices.")
-print("   *Please note that the cell type specific genes included in this output have not yet been filtered based on whether they were identified as specifically expressed in different cell types in different publications (e.g. a gene that has been identified as specifically expressed in astrocytes in one publication but identified as specifically expressed in neurons in another publication).")
+ print("...The file AVE_Expression_CellType_Tag_bySample.csv includes the average z-score for each sample for all genes identified as cell type specific for each cell type from each publication - a cell type index. This can be treated as one type of estimate of the relative balance of each cell type across all samples.")
+print("...The file CorrelationMatrixCellIndexVsCellIndex.csv shows the correlation between each of these cell type indices.")
+print("...Please note that the cell type specific genes included in this output have not yet been filtered based on whether they were identified as specifically expressed in different cell types in different publications (e.g. a gene that has been identified as specifically expressed in astrocytes in one publication but identified as specifically expressed in neurons in another publication).")
   
   
   #############################################
@@ -257,7 +240,7 @@ print("   *Please note that the cell type specific genes included in this output
   write.csv(CellTypeSpecificGenes_Master3_Overlap, "CellTypeSpecificGenes_Master3_Overlap.csv")
   
   print("Output added to working directory: CellTypeSpecificGenes_Master3_Overlap.csv")
-  print("   *CellTypeSpecificGenes_Master3_Overlap.csv indicates how many of the gene symbols included in your dataset are indicated to be cell type specific in cell type specific gene lists from different publications or for different cell types")
+  print("...CellTypeSpecificGenes_Master3_Overlap.csv indicates how many of the gene symbols included in your dataset are indicated to be cell type specific in cell type specific gene lists from different publications or for different cell types")
   
   
   #############################################
@@ -299,8 +282,8 @@ print("   *Please note that the cell type specific genes included in this output
   write.csv(ZscoreInput_Expression_CellType_NoPrimaryOverlap, "ZscoreInput_Expression_CellType_NoPrimaryOverlap.csv")
 
   print("Output added to working directory: ZscoreInput_Expression_CellType_NoPrimaryOverlap.csv")
-  print("   *A data frame listing all of the cell type specific genes in your dataset and their respective expression for each sample (in z-scores).") 
-  print("   *The cell type specific genes included in this output have been filtered so that the data is now removed that was associated with gene symbols that were identified as specifically expressed in different cell types in different publications (e.g. a gene that has been identified as specifically expressed in astrocytes in one publication but identified as specifically expressed in neurons in another publication).")
+  print("...A data frame listing all of the cell type specific genes in your dataset and their respective expression for each sample (in z-scores).") 
+  print("...The cell type specific genes included in this output have been filtered so that the data is now removed that was associated with gene symbols that were identified as specifically expressed in different cell types in different publications (e.g. a gene that has been identified as specifically expressed in astrocytes in one publication but identified as specifically expressed in neurons in another publication).")
   
   
   write.csv(table(ZscoreInput_Expression_CellType_NoPrimaryOverlap$Tag), "NumberOfGenesInYourDatasetFoundInEachPublicationsCellTypeSpecificGeneList_NoNonSpecific.csv")
@@ -308,27 +291,14 @@ print("   *Please note that the cell type specific genes included in this output
   CellTypeSpecificGenes_Master3_PrimaryTable_NoPrimaryOverlap<-table(ZscoreInput_Expression_CellType_NoPrimaryOverlap$CellType_Primary)
   write.csv(CellTypeSpecificGenes_Master3_PrimaryTable_NoPrimaryOverlap, "NumberOfGenesInYourDatasetSpecificToEachPrimaryCellType.csv")
   
-  print("Two files have been outputted to your working directory: NumberOfGenesInYourDatasetFoundInEachPublicationsCellTypeSpecificGeneList_NoNonSpecific.csv that tells you the number of gene symbols included in your dataset that were found in each publication's cell type specific gene list. The cell type specific genes included in this output have been filtered so that the data is now removed that was associated with gene symbols that were identified as specifically expressed in different cell types in different publications (e.g. a gene that has been identified as specifically expressed in astrocytes in one publication but identified as specifically expressed in neurons in another publication). The file  NumberOfGenesInYourDatasetSpecificToEachPrimaryCellType.csv tells you how many genes included in your dataset were found to be specific to each primary cell type.")
+  print("Output added to working directory: NumberOfGenesInYourDatasetFoundInEachPublicationsCellTypeSpecificGeneList_NoNonSpecific.csv and  NumberOfGenesInYourDatasetSpecificToEachPrimaryCellType.csv")
+print("...NumberOfGenesInYourDatasetFoundInEachPublicationsCellTypeSpecificGeneList_NoNonSpecific.csv that tells you the number of gene symbols included in your dataset that were found in each publication's cell type specific gene list. The cell type specific genes included in this output have been filtered so that the data is now removed that was associated with gene symbols that were identified as specifically expressed in different cell types in different publications (e.g. a gene that has been identified as specifically expressed in astrocytes in one publication but identified as specifically expressed in neurons in another publication).") 
+print("...The file  NumberOfGenesInYourDatasetSpecificToEachPrimaryCellType.csv tells you how many genes included in your dataset were found to be specific to each primary cell type.")
   
     
   ######################################################################
-  #HALP, WHAT DO?
-  #MH: is the problem here that you don't know what this code is for?  Or is there something wrong with it?  it looks redundant with some of the other code below.
-  #I moved some of this code up (just the part characterizing the number of cell type specific genes).
-  
-  #ZscoreZhang_Expression_CellType_NoPrimaryOverlap_Mean<-matrix(0, nrow=length(table(ZscoreInput_Expression_CellType_NoPrimaryOverlap$CellType_Primary)), ncol=(length(ZscoreInput_Expression_CellType_NoPrimaryOverlap[1,])-14))
-  
-  #row.names(ZscoreZhang_Expression_CellType_NoPrimaryOverlap_Mean)<-names(table(ZscoreInput_Expression_CellType_NoPrimaryOverlap$CellType_Primary))
-  
-  #colnames(ZscoreZhang_Expression_CellType_NoPrimaryOverlap_Mean)<-colnames(ZscoreInput_Expression_CellType_NoPrimaryOverlap)[-c(1:14)]
-  
-  #end help what do
-  # Megan has an "old version" forloop commented out in the Original doc.
-  #is this function not used?
-  ######################################
-  
+
   #This code just creates an object aligning each of the publication's cell type specific gene lists with their primary cell type. 
-  
   temp<-data.frame(ZscoreInput_Expression_CellType_NoPrimaryOverlap$Tag, ZscoreInput_Expression_CellType_NoPrimaryOverlap$CellType_Primary) 
   dim(temp)
   # [1] 2434    2
@@ -357,10 +327,15 @@ print("   *Please note that the cell type specific genes included in this output
   
   head(ZscoreInput_Expression_CellType_NoPrimaryOverlap_MeanTag)
   
+  setwd("..")
+  getwd()
+  
   write.csv(ZscoreInput_Expression_CellType_NoPrimaryOverlap_MeanTag, "Zscore_Expression_CellType_NoPrimaryOverlap_MeanTag.csv")
   
-  print("A data frame has been outputted to your working directory that includes the publication-specific cell type indices for each sample: the average z-score for each publication's cell type specific gene lists, after having filtered out the genes that are found to be specific to different kinds of cells in different publications (i.e., genes that have expression that is actually non-cell type specific!) : ZscoreInput_Expression_CellType_NoPrimaryOverlap_MeanTag.")
+  print("Output added to working directory: ZscoreInput_Expression_CellType_NoPrimaryOverlap_MeanTag")
+  print("... ZscoreInput_Expression_CellType_NoPrimaryOverlap_MeanTag is a data frame that includes the publication-specific cell type indices for each sample: the average z-score for each publication's cell type specific gene lists, after having filtered out the genes that are found to be specific to different kinds of cells in different publications (i.e., genes that have expression that is actually non-cell type specific!).")
   
+  setwd("Detailed_CellTypeAnalysisOutput")
   
   #Making histograms for each cell type tag:
   dir.create("Cell Type Histograms")
@@ -373,8 +348,11 @@ print("   *Please note that the cell type specific genes included in this output
   setwd("..")
   getwd()
   
-  print("A subdirectory named Cell Type Histograms has been created within your working directory. This directory contains histograms illustrating the distribution of each of your publication-specific cell type indices across samples. You probably want to examine these for extreme outliers.")
+  print("A subdirectory named Cell Type Histograms has been created within your working directory.")
+print("...This directory contains histograms illustrating the distribution of each of your publication-specific cell type indices across samples. You probably want to examine these for extreme outliers.")
 
+setwd("..")
+getwd()
   
   ############################
   
@@ -388,7 +366,8 @@ print("   *Please note that the cell type specific genes included in this output
   
   write.csv(CellType_NoPrimaryOverlap_MeanTag_CorrMatrix, "CellType_NoPrimaryOverlap_MeanTag_CorrMatrix.csv")
   
-  print("Two files have been outputted to your working directory: CellType_NoPrimaryOverlap_MeanTag_CorrMatrix.csv and Heatmap_CellType_NoPrimaryOverlap_MeanTag.png. Both of these files illustrate the correlations between your publication-specific cell type indices.")
+  print("Output added to working directory: CellType_NoPrimaryOverlap_MeanTag_CorrMatrix.csv and Heatmap_CellType_NoPrimaryOverlap_MeanTag.png.")
+print("...Both of these files illustrate the correlations between your publication-specific cell type indices.")
   
   ###############################################
   
@@ -413,9 +392,13 @@ print("   *Please note that the cell type specific genes included in this output
   
   write.csv(ZscoreInput_Expression_CellType_NoPrimaryOverlap_Mean, "Zscore_Expression_CellType_NoPrimaryOverlap_Mean.csv")
   
-  print("A files have been outputted to your working directory: Zscore_Expression_CellType_NoPrimaryOverlap_Mean.csv. This file includes the average cell type indices for each primary cell type for each sample: the average of the publication- specific cell type indices.")
+  print("Output added to working directory: Zscore_Expression_CellType_NoPrimaryOverlap_Mean.csv.")
+print("...This file includes the average cell type indices for each primary cell type for each sample: the average of the publication- specific cell type indices.")
   
   ##############################################
+
+setwd("Detailed_CellTypeAnalysisOutput")
+
   #Making histograms for each primary cell type:
   dir.create("Primary cell type Histograms")
   setwd("Primary cell type Histograms")
@@ -425,9 +408,13 @@ print("   *Please note that the cell type specific genes included in this output
     dev.off()
   }
   
-  print("A subdirectory named Primary cell type Histograms has been created within your working directory. This directory contains histograms illustrating the distribution of each of the averaged cell type indices for each primary cell type across samples. You probably want to examine these for extreme outliers.")
+print("A subdirectory named Primary cell type Histograms has been created within your working directory.")
+print("...This directory contains histograms illustrating the distribution of each of the averaged cell type indices for each primary cell type across samples. You probably want to examine these for extreme outliers.")
 
   #MH: do we need to reset the working directory? I just added this code because I didn't see it anywhere else.
+  setwd("..")
+  getwd()
+  
   setwd("..")
   getwd()
   
@@ -444,13 +431,16 @@ print("   *Please note that the cell type specific genes included in this output
   
   write.csv(CellTypeIndexNoNA3_NormBest_NoPrimaryOverlap_CorrMatrix, "CellTypeIndexNoNA3_NormBest_NoPrimaryOverlap_CorrMatrix.csv")
   
-  print("Two files have been outputted to your working directory: CellTypeIndexNoNA3_NormBest_NoPrimaryOverlap_CorrMatrix.csv and Heatmap_CorMatrixPrimaryCellsNoOverlap.png. Both of these files illustrate the correlations between the averaged cell type indices for each primary cell type across samples.")
+  print("Output added to working directory: CellTypeIndexNoNA3_NormBest_NoPrimaryOverlap_CorrMatrix.csv and Heatmap_CorMatrixPrimaryCellsNoOverlap.png.")
+print("...Both of these files illustrate the correlations between the averaged cell type indices for each primary cell type across samples.")
   
   ##################################################
-  #MH: I think  you returned the wrong output, LOL.
-  #return(CellTypeSpecificGenes_Master3NoNA)
+#Returning the final cell type indices to the workspace:
+print("The output returned to your workspace is a list containing two data frames: PublicationSpecific_CellTypeIndex and AveragePrimary_CellTypeIndex. These dataframes provide estimates for the relative balance of each cell type across samples.")
+
   CellTypeIndexOutput<-list(ZscoreInput_Expression_CellType_NoPrimaryOverlap_MeanTag, ZscoreInput_Expression_CellType_NoPrimaryOverlap_Mean)
   names(CellTypeIndexOutput)<-c("PublicationSpecific_CellTypeIndex", "AveragePrimary_CellTypeIndex")
   return(CellTypeIndexOutput)
+
 }
 
